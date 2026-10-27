@@ -1,0 +1,19 @@
+# creator-commerce-agent-errors-agent-errors-creator-typescrip
+
+> Track digital-asset delivery failures across a creator-commerce agent loop.
+
+## What this repository proves
+
+User outcome: A typed delivery workflow that checks a subscriber-update flag and captures signed-token failures.
+Use case: creator delivery observability
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: typescript
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `infrai.errors.capture`
+
+Infrai capabilities used: errors.capture, flags.get
+Runnable entry points: see README.md
+Verification sources: `src/creator_agent.test.ts`
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt

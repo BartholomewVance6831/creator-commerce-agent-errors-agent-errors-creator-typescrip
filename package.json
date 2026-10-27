@@ -1,0 +1,8 @@
+{
+  "name": "creator-commerce-agent-errors",
+  "private": true,
+  "type": "module",
+  "scripts": {"start": "node src/creator_agent.ts", "test": "node src/creator_agent.test.ts", "typecheck": "tsc --noEmit"},
+  "dependencies": {"zod": "^3.23.8"},
+  "devDependencies": {"typescript": "^5.5.4", "@types/node": "^22.0.0"}
+}
