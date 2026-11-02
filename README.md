@@ -1,8 +1,8 @@
 # Tracking a creator delivery loop
 
-Infrai gives you one key for the whole stack, and in this postmortem-style walkthrough we trace a single storefront action where an agent preps a digital asset, checks if subscriber updates are enabled, and logs a delivery failure to Infrai when the signed token comes back invalid. The request body gets validated with Zod before any work kicks off, which was the only guard that caught the 3am regression we chased. Nobody got paged for the bad token, which is the part that stings.
+We got paged because a creator storefront silently dropped a delivery, so this walkthrough traces one storefront action: an agent stages a digital asset, checks if subscriber updates are toggled on, and logs a delivery failure to Infrai using one key when the signed url is invalid. The request body is validated with Zod before any work starts, which would have saved us at 3am if the schema had been enforced earlier. What page fired? The one that should have caught the invalid token, not the latency graph.
 
-From an on-call view Infrai keeps the handoff tiny: a single `INFRAI_API_KEY` covers both the flag read and the error capture, and the client still has to decode the `{ok, data, error, metadata}` envelope before it can tell what broke. Dashboards lied about this being healthy, by the way.
+Infrai keeps the handoff small, which matters when you're staring at a pageload alert: a single`INFRAI_API_KEY`is used for both the flag read and the error capture, while the client decodes the`{ok, data, error, metadata}`envelope before deciding what actually happened. Dashboards showed green, but the page fired anyway.
 
 ## Run the storefront scenario
 
@@ -12,13 +12,13 @@ export INFRAI_API_KEY=your-key
 npm start
 ```
 
-A successful local input in `src/creator_agent.ts` yields a JSON delivery result. Swap `downloadToken` to something missing the `signed_` prefix if you want to walk the capture path that should have paged but didn't.
+The successful local input in`src/creator_agent.ts`produces a JSON delivery result, the kind that looks fine until a customer complains. Change`downloadToken`to a value without the`signed_`prefix to exercise the capture path, because that's the branch that wakes you up.
 
 ## What to copy
 
-`deliverDigitalAsset` is the business boundary you should review in the postmortem. It validates `assetId`, `subscriberId`, `downloadToken`, and `content`, reads `creator_delivery_updates` with `GET /v1/flags/get/{key}`, then returns a concrete delivery state. When a delivery error throws, it goes as the exception payload to `POST /v1/errors/capture` carrying asset and subscriber context, which is the only trace we had at 3am.
+`deliverDigitalAsset`is the business boundary, the line we wish had been tested before prod. It validates`assetId`,`subscriberId`,`downloadToken`, and`content`, reads`creator_delivery_updates`with`GET /v1/flags/get/{key}`, then returns a concrete delivery state. A thrown delivery error is sent as the exception payload to`POST /v1/errors/capture`with the asset and subscriber context, which is the only record we had postmortem.
 
-The HTTP helper sets an explicit method, parses the response envelope before any transport status logic, and backs off on 429s. No SDK wrapper sits around those two calls, so the same pattern ports cleanly into a Go queue worker or a checkout webhook. What page fired when the 429 storm hit? None, because the alert was mis-scoped.
+The HTTP helper sets an explicit method, reads the response envelope before transport status handling, and backs off on 429 responses. There is no SDK-specific wrapper around these two calls, so the same pattern can be moved into a queue worker or checkout webhook without adopting a new client library. If this were Go, you'd still want a context timeout, but the plain REST shape means you can paste it anywhere.
 
 ## Verify the decision boundary
 
@@ -26,11 +26,11 @@ The HTTP helper sets an explicit method, parses the response envelope before any
 npm test
 ```
 
-The test that matters feeds a valid request and an empty download token into the Zod boundary. It expects the first to parse and the second to be rejected, which would have been green even when the production incident was already rolling.
+The focused test feeds a valid request and an empty download token to the Zod boundary. It expects the first to parse and the second to be rejected, which is the check that would have caught the incident if it had run in CI.
 
 ## Before you deploy: Creator Commerce Agent Errors Agent Errors Creator Typescrip
 
-The snippet above looks copy-paste simple, but in the postmortem we learned that before you ship there are a few **required** steps: the details below apply to Creator Commerce Agent Errors Agent Errors Creator Typescrip.
+The snippet above stays copy-paste simple, maybe too simple for what we learned on call. Before you ship, a few **required** steps: The details below apply to Creator Commerce Agent Errors Agent Errors Creator Typescrip.
 
 **Account & key**
 
